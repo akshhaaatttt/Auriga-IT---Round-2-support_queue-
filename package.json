@@ -1,0 +1,36 @@
+{
+  "name": "support_queue",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dynamic SLA-aware priority queue for a small IT helpdesk",
+  "type": "module",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names server,client --prefix-colors blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w server && npm run build -w client",
+    "start": "npm run start -w server",
+    "seed": "npm run seed -w server",
+    "test": "npm run test -w server && npm run test -w client",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.0.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0"
+  },
+  "allowScripts": {
+    "better-sqlite3": false,
+    "esbuild": false
+  }
+}

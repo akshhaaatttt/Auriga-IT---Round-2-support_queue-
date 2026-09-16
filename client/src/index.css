@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline-color: var(--color-slate-900);
+  }
+}
