@@ -1,11 +1,9 @@
 import { Search, X } from 'lucide-react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { TicketStatus } from '../types/api';
-import { TICKET_STATUSES } from '../types/api';
-import { cn } from '../utils/cn';
-import { STATUS_LABELS } from '../utils/labels';
 
 export const QUEUE_VIEWS = [
-  { id: 'all', label: 'All' },
+  { id: 'all', label: 'All tickets' },
   { id: 'overdue', label: 'Overdue' },
   { id: 'mine', label: 'Assigned to me' },
   { id: 'unassigned', label: 'Unassigned' },
@@ -15,9 +13,11 @@ export type QueueView = (typeof QUEUE_VIEWS)[number]['id'];
 export type StatusFilter = 'ACTIVE' | 'ANY' | TicketStatus;
 
 export const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: 'ACTIVE', label: 'Active (open + in progress)' },
-  { value: 'ANY', label: 'All statuses' },
-  ...TICKET_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'OPEN', label: 'Open' },
+  { value: 'IN_PROGRESS', label: 'In progress' },
+  { value: 'RESOLVED', label: 'Resolved' },
+  { value: 'ANY', label: 'All' },
 ];
 
 interface QueueToolbarProps {
@@ -31,6 +31,26 @@ interface QueueToolbarProps {
   hasCurrentAgent: boolean;
 }
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
+
+/** "/" focuses search from anywhere on the page, unless the user is typing or a dialog is open. */
+function useSlashToFocus(ref: RefObject<HTMLInputElement | null>) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTypingTarget(event.target) || document.querySelector('dialog[open]')) return;
+      event.preventDefault();
+      ref.current?.focus();
+      ref.current?.select();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [ref]);
+}
+
 export function QueueToolbar({
   search,
   onSearchChange,
@@ -41,78 +61,91 @@ export function QueueToolbar({
   overdueCount,
   hasCurrentAgent,
 }: QueueToolbarProps) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  useSlashToFocus(searchRef);
+
   return (
-    <div className="flex flex-col gap-3 border-b border-slate-200 p-4 xl:flex-row xl:items-center">
-      <div className="relative xl:w-80">
+    <div className="flex flex-col gap-3 px-4 py-3 xl:flex-row xl:items-center">
+      <div className="relative w-full xl:max-w-sm">
         <label htmlFor="ticket-search" className="sr-only">
-          Search by customer or ticket title
+          Search tickets by customer or title
         </label>
-        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-subtle" />
         <input
+          ref={searchRef}
           id="ticket-search"
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search customer or ticket title…"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && search) {
+              event.preventDefault();
+              onSearchChange('');
+            }
+          }}
+          placeholder="Search customers or ticket titles"
           maxLength={100}
           autoComplete="off"
-          className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-2 focus:outline-slate-900/10 [&::-webkit-search-cancel-button]:hidden"
+          spellCheck={false}
+          aria-keyshortcuts="/"
+          className="control pr-16 pl-9 [&::-webkit-search-cancel-button]:hidden"
         />
-        {search && (
-          <button
-            type="button"
-            onClick={() => onSearchChange('')}
-            aria-label="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X aria-hidden className="size-4" />
-          </button>
-        )}
+        <span className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center">
+          {search ? (
+            <button
+              type="button"
+              onClick={() => {
+                onSearchChange('');
+                searchRef.current?.focus();
+              }}
+              aria-label="Clear search text"
+              className="btn btn-ghost h-7 w-7 px-0"
+            >
+              <X aria-hidden className="size-4" />
+            </button>
+          ) : (
+            <kbd className="kbd" aria-hidden>
+              /
+            </kbd>
+          )}
+        </span>
       </div>
 
-      <div role="group" aria-label="Queue view" className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
-        {QUEUE_VIEWS.map(({ id, label }) => {
-          const disabled = id === 'mine' && !hasCurrentAgent;
-          const active = view === id;
-          return (
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:ml-auto">
+        <div role="group" aria-label="Queue view" className="segmented">
+          {QUEUE_VIEWS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
-              aria-pressed={active}
-              disabled={disabled}
+              aria-pressed={view === id}
+              disabled={id === 'mine' && !hasCurrentAgent}
               onClick={() => onViewChange(id)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900',
-              )}
+              className="segment"
             >
               {label}
               {id === 'overdue' && overdueCount !== null && overdueCount > 0 && (
-                <span className="rounded-full bg-red-600 px-1.5 text-xs font-semibold text-white tabular-nums">
+                <span className="rounded-full bg-danger px-1.5 font-mono text-[11px] leading-4.5 font-semibold text-white tabular-nums">
                   {overdueCount}
+                  <span className="sr-only"> overdue</span>
                 </span>
               )}
             </button>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-2 text-sm text-slate-600 xl:ml-auto">
-        <label htmlFor="status-filter" className="whitespace-nowrap">
-          Status
-        </label>
-        <select
-          id="status-filter"
-          value={statusFilter}
-          onChange={(event) => onStatusFilterChange(event.target.value as StatusFilter)}
-          className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-2 pr-8 text-sm text-slate-900 sm:w-auto"
-        >
-          {STATUS_FILTER_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
           ))}
-        </select>
+        </div>
+
+        <div role="group" aria-label="Status" className="segmented">
+          {STATUS_FILTER_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={statusFilter === value}
+              onClick={() => onStatusFilterChange(value)}
+              className="segment px-2.5"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

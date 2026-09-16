@@ -1,19 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Express } from 'express';
-import type { DatabaseConnection } from './db/database.js';
+import type { Services } from './container.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { AgentRepository } from './repositories/agentRepository.js';
-import { TicketRepository } from './repositories/ticketRepository.js';
 import { createAgentRouter } from './routes/agentRoutes.js';
 import { createTicketRouter } from './routes/ticketRoutes.js';
-import { AgentService } from './services/agentService.js';
-import { TicketService, type Clock } from './services/ticketService.js';
 
 export interface AppOptions {
-  db: DatabaseConnection;
-  clock?: Clock;
+  services: Services;
   corsOrigins?: readonly string[];
   /** When set and present on disk, the built client is served from this directory. */
   clientDistPath?: string;
@@ -30,11 +25,7 @@ function serveClient(app: Express, clientDistPath: string): void {
   });
 }
 
-export function createApp({ db, clock = Date.now, corsOrigins = [], clientDistPath }: AppOptions): Express {
-  const agentRepository = new AgentRepository(db);
-  const ticketService = new TicketService(new TicketRepository(db), agentRepository, clock);
-  const agentService = new AgentService(agentRepository);
-
+export function createApp({ services, corsOrigins = [], clientDistPath }: AppOptions): Express {
   const app = express();
   app.disable('x-powered-by');
   app.use((_req, res, next) => {
@@ -47,8 +38,8 @@ export function createApp({ db, clock = Date.now, corsOrigins = [], clientDistPa
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
-  app.use('/api/tickets', createTicketRouter(ticketService));
-  app.use('/api/agents', createAgentRouter(agentService));
+  app.use('/api/tickets', createTicketRouter(services.tickets, services.escalation, services.clock));
+  app.use('/api/agents', createAgentRouter(services.agents));
   app.use('/api', notFoundHandler);
 
   if (clientDistPath) serveClient(app, clientDistPath);

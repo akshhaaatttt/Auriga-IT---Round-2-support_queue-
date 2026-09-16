@@ -6,6 +6,8 @@ interface DialogProps {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
+  /** Small line above the title, e.g. a ticket reference. */
+  eyebrow?: ReactNode;
   description?: ReactNode;
   variant?: 'modal' | 'drawer';
   children: ReactNode;
@@ -13,11 +15,12 @@ interface DialogProps {
 
 /**
  * Thin wrapper over the native <dialog> element, which provides focus trapping,
- * Escape-to-close, inert background and focus restoration without extra dependencies.
+ * Escape-to-close, an inert background and focus restoration without extra dependencies.
  */
-export function Dialog({ open, onClose, title, description, variant = 'modal', children }: DialogProps) {
+export function Dialog({ open, onClose, title, eyebrow, description, variant = 'modal', children }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -26,10 +29,13 @@ export function Dialog({ open, onClose, title, description, variant = 'modal', c
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
+  const isDrawer = variant === 'drawer';
+
   return (
     <dialog
       ref={ref}
       aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -38,31 +44,31 @@ export function Dialog({ open, onClose, title, description, variant = 'modal', c
         if (event.target === event.currentTarget) onClose();
       }}
       className={cn(
-        'bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40',
-        variant === 'drawer'
-          ? 'm-0 ml-auto h-dvh max-h-dvh w-full max-w-xl'
-          : 'm-auto w-[calc(100%-2rem)] max-w-xl rounded-xl',
+        'bg-surface p-0 text-ink shadow-(--shadow-overlay) backdrop:bg-ink/35 backdrop:backdrop-blur-[1px]',
+        isDrawer
+          ? 'm-0 ml-auto h-dvh max-h-dvh w-full max-w-[36rem] border-l border-line open:animate-drawer-in'
+          : 'm-auto w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-line open:animate-modal-in',
       )}
     >
       {open && (
-        <div className={cn('flex flex-col', variant === 'drawer' ? 'h-full' : 'max-h-[90dvh]')}>
-          <div className="flex items-start gap-4 border-b border-slate-200 px-5 py-4">
+        <div className={cn('flex flex-col', isDrawer ? 'h-full' : 'max-h-[min(90dvh,52rem)]')}>
+          <div className="flex items-start gap-4 border-b border-line px-5 py-4 sm:px-6">
             <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-lg font-semibold leading-snug">
+              {eyebrow && <div className="mb-1">{eyebrow}</div>}
+              <h2 id={titleId} className="text-lg leading-snug font-semibold text-pretty text-ink">
                 {title}
               </h2>
-              {description && <div className="mt-1 text-sm text-slate-600">{description}</div>}
+              {description && (
+                <div id={descriptionId} className="mt-1 text-sm text-ink-muted">
+                  {description}
+                </div>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-            >
+            <button type="button" onClick={onClose} aria-label="Close" className="btn btn-ghost btn-icon -mr-2">
               <X aria-hidden className="size-5" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 sm:px-6">{children}</div>
         </div>
       )}
     </dialog>

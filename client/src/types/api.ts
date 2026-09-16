@@ -1,4 +1,4 @@
-export const PRIORITIES = ['URGENT', 'NORMAL', 'LOW'] as const;
+export const PRIORITIES = ['URGENT', 'HIGH', 'NORMAL', 'LOW'] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
 export const TICKET_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED'] as const;
@@ -22,6 +22,9 @@ export interface Ticket {
   createdAt: string;
   updatedAt: string;
   slaDeadline: string;
+  /** Times the server's automated escalation check has raised this ticket's priority. */
+  escalationCount: number;
+  lastEscalatedAt: string | null;
   isOverdue: boolean;
 }
 
@@ -45,7 +48,10 @@ export interface TicketPage {
 
 export interface TicketCounts {
   total: number;
+  active: number;
   overdue: number;
+  urgent: number;
+  dueSoon: number;
   open: number;
   inProgress: number;
   resolved: number;

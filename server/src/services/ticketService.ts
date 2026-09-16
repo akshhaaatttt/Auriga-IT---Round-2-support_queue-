@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { calculateSlaDeadline } from '../domain/sla.js';
+import type { Clock } from '../models/clock.js';
 import { NotFoundError, ValidationError } from '../models/errors.js';
 import type { Ticket } from '../models/ticket.js';
 import type { PaginatedTickets, QueueMeta, TicketDto } from '../models/ticketDto.js';
@@ -14,14 +15,12 @@ import type {
 import { isOverdue } from '../sorting/priorityQueue.js';
 import type { CreateTicketInput, ListTicketsQuery, UpdateTicketInput } from '../validation/ticketSchemas.js';
 
-export type Clock = () => number;
-
 export interface QueueSummary {
   counts: TicketCounts;
   meta: QueueMeta;
 }
 
-const toIso = (timestamp: number): string => new Date(timestamp).toISOString();
+export const toIso = (timestamp: number): string => new Date(timestamp).toISOString();
 
 function toDto(ticket: TicketWithAgent, now: number): TicketDto {
   return {
@@ -29,6 +28,7 @@ function toDto(ticket: TicketWithAgent, now: number): TicketDto {
     createdAt: toIso(ticket.createdAt),
     updatedAt: toIso(ticket.updatedAt),
     slaDeadline: toIso(ticket.slaDeadline),
+    lastEscalatedAt: ticket.lastEscalatedAt === null ? null : toIso(ticket.lastEscalatedAt),
     isOverdue: isOverdue(ticket, now),
   };
 }
@@ -82,6 +82,8 @@ export class TicketService {
       createdAt: now,
       updatedAt: now,
       slaDeadline: calculateSlaDeadline(now, input.priority),
+      escalationCount: 0,
+      lastEscalatedAt: null,
     };
     this.tickets.insert(ticket);
     return this.getTicket(ticket.id);
@@ -93,7 +95,8 @@ export class TicketService {
 
     const changes: TicketChanges = { ...input };
     if (input.priority !== undefined && input.priority !== existing.priority) {
-      // The SLA is a promise tied to priority, always measured from when the customer reported it.
+      // An agent re-classifying a ticket resets its SLA promise to match the new priority, measured
+      // from when the customer reported it. (Automated escalation deliberately does not; see EscalationService.)
       changes.slaDeadline = calculateSlaDeadline(existing.createdAt, input.priority);
     }
 

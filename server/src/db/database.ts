@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { SCHEMA_SQL } from './schema.js';
+import { runMigrations } from './migrations.js';
 
 export type DatabaseConnection = Database.Database;
 
@@ -15,6 +15,9 @@ export function openDatabase(filePath: string): DatabaseConnection {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
-  db.exec(SCHEMA_SQL);
+  const applied = runMigrations(db);
+  if (applied.length > 0 && filePath !== IN_MEMORY_DATABASE) {
+    console.log(`[db] Applied schema migration(s): ${applied.join(', ')}`);
+  }
   return db;
 }

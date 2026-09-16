@@ -61,12 +61,20 @@ describe('time measurements', () => {
 });
 
 describe('sortTickets — non-overdue tickets', () => {
-  it('orders by priority: urgent, then normal, then low', () => {
+  it('orders by priority: urgent, then high, then normal, then low', () => {
     const low = makeTicket({ id: 'low', priority: 'LOW' });
     const normal = makeTicket({ id: 'normal', priority: 'NORMAL' });
+    const high = makeTicket({ id: 'high', priority: 'HIGH' });
     const urgent = makeTicket({ id: 'urgent', priority: 'URGENT' });
 
-    expect(ids(sortTickets([low, normal, urgent], NOW))).toEqual(['urgent', 'normal', 'low']);
+    expect(ids(sortTickets([low, normal, urgent, high], NOW))).toEqual(['urgent', 'high', 'normal', 'low']);
+  });
+
+  it('keeps a high ticket with more time left ahead of a normal ticket due sooner', () => {
+    const high = makeTicket({ id: 'high', priority: 'HIGH', deadlineIn: 7 * HOUR });
+    const normal = makeTicket({ id: 'normal', priority: 'NORMAL', deadlineIn: MINUTE });
+
+    expect(ids(sortTickets([normal, high], NOW))).toEqual(['high', 'normal']);
   });
 
   it('puts the urgent ticket closest to its deadline first', () => {
@@ -130,9 +138,10 @@ describe('sortTickets — overdue tickets', () => {
   it('uses priority when two tickets are overdue by the same amount', () => {
     const normal = makeTicket({ id: 'normal', priority: 'NORMAL', deadlineIn: -HOUR });
     const urgent = makeTicket({ id: 'urgent', priority: 'URGENT', deadlineIn: -HOUR });
+    const high = makeTicket({ id: 'high', priority: 'HIGH', deadlineIn: -HOUR });
     const low = makeTicket({ id: 'low', priority: 'LOW', deadlineIn: -HOUR });
 
-    expect(ids(sortTickets([normal, low, urgent], NOW))).toEqual(['urgent', 'normal', 'low']);
+    expect(ids(sortTickets([normal, low, high, urgent], NOW))).toEqual(['urgent', 'high', 'normal', 'low']);
   });
 
   it('uses the oldest creation time when overdue duration and priority are equal', () => {
@@ -207,6 +216,7 @@ describe('sortTickets — general properties', () => {
       makeTicket({ id: 'low', priority: 'LOW', deadlineIn: 20 * HOUR }),
       makeTicket({ id: 'normal-due-later', priority: 'NORMAL', deadlineIn: 20 * HOUR }),
       makeTicket({ id: 'urgent-due-later', priority: 'URGENT', deadlineIn: 100 * MINUTE }),
+      makeTicket({ id: 'high-due-soon', priority: 'HIGH', deadlineIn: 5 * MINUTE }),
       makeTicket({ id: 'resolved', priority: 'URGENT', status: 'RESOLVED', deadlineIn: -HOUR }),
       makeTicket({ id: 'slightly-overdue-urgent', priority: 'URGENT', deadlineIn: -10 * MINUTE }),
       makeTicket({ id: 'normal-due-soon', priority: 'NORMAL', deadlineIn: 20 * MINUTE }),
@@ -219,6 +229,7 @@ describe('sortTickets — general properties', () => {
       'slightly-overdue-urgent',
       'urgent-due-soon',
       'urgent-due-later',
+      'high-due-soon',
       'normal-due-soon',
       'normal-due-later',
       'low',
@@ -227,7 +238,7 @@ describe('sortTickets — general properties', () => {
   });
 
   describe('large collections', () => {
-    const PRIORITY_VALUES: readonly Priority[] = ['URGENT', 'NORMAL', 'LOW'];
+    const PRIORITY_VALUES: readonly Priority[] = ['URGENT', 'HIGH', 'NORMAL', 'LOW'];
     const STATUS_VALUES: readonly TicketStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED'];
 
     function generateTickets(count: number, seed: number): QueueTicket[] {

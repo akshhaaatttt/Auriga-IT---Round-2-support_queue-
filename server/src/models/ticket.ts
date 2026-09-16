@@ -1,4 +1,5 @@
-export const PRIORITIES = ['URGENT', 'NORMAL', 'LOW'] as const;
+/** Ordered from most to least important. */
+export const PRIORITIES = ['URGENT', 'HIGH', 'NORMAL', 'LOW'] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
 export const TICKET_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED'] as const;
@@ -18,8 +19,11 @@ export interface Ticket {
   assignedAgentId: string | null;
   createdAt: number;
   updatedAt: number;
-  /** Fixed at creation (createdAt + SLA(priority)); only recomputed when priority changes. */
+  /** Fixed at creation (createdAt + SLA(priority)); only recomputed when an agent changes priority. */
   slaDeadline: number;
+  /** How many times the automated escalation check has raised this ticket's priority. */
+  escalationCount: number;
+  lastEscalatedAt: number | null;
 }
 
 /** The subset of ticket fields the priority queue needs. */

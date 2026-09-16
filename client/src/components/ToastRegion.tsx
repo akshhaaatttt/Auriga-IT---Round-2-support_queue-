@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, X } from 'lucide-react';
 import type { Toast } from '../hooks/useToasts';
 import { cn } from '../utils/cn';
 
@@ -11,29 +11,24 @@ export function ToastRegion({ toasts, onDismiss }: ToastRegionProps) {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2"
+      className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2"
     >
       {toasts.map((toast) => {
-        const Icon = toast.tone === 'success' ? CheckCircle2 : AlertCircle;
+        const success = toast.tone === 'success';
+        const Icon = success ? CheckCircle2 : AlertCircle;
         return (
           <div
             key={toast.id}
-            role={toast.tone === 'error' ? 'alert' : 'status'}
-            className={cn(
-              'pointer-events-auto flex items-start gap-2 rounded-lg border bg-white px-3 py-2.5 text-sm shadow-lg',
-              toast.tone === 'success' ? 'border-emerald-200' : 'border-red-200',
-            )}
+            role={success ? 'status' : 'alert'}
+            className="pointer-events-auto flex animate-toast-in items-center gap-2.5 rounded-lg bg-ink py-2.5 pr-2 pl-3 text-sm text-white shadow-(--shadow-overlay)"
           >
-            <Icon
-              aria-hidden
-              className={cn('mt-0.5 size-4 shrink-0', toast.tone === 'success' ? 'text-emerald-600' : 'text-red-600')}
-            />
-            <p className="flex-1 text-slate-800">{toast.message}</p>
+            <Icon aria-hidden className={cn('size-4 shrink-0', success ? 'text-on-ink-success' : 'text-on-ink-danger')} />
+            <p className="flex-1">{toast.message}</p>
             <button
               type="button"
               onClick={() => onDismiss(toast.id)}
               aria-label="Dismiss notification"
-              className="rounded p-0.5 text-slate-400 hover:text-slate-700"
+              className="btn h-7 w-7 px-0 text-white/70 hover:bg-white/10 hover:text-white"
             >
               <X aria-hidden className="size-4" />
             </button>

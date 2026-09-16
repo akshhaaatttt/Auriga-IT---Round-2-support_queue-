@@ -44,7 +44,12 @@ describe('GET /api/tickets', () => {
 
     expect(status).toBe(200);
     expect(body.tickets).toHaveLength(20);
-    expect(body.pagination).toEqual({ page: 1, limit: 20, total: SEED_TICKETS.length, totalPages: 2 });
+    expect(body.pagination).toEqual({
+      page: 1,
+      limit: 20,
+      total: SEED_TICKETS.length,
+      totalPages: Math.ceil(SEED_TICKETS.length / 20),
+    });
     expect(body.meta.serverTime).toBe(new Date(NOW).toISOString());
 
     const titles = body.tickets.map((ticket) => ticket.title);
@@ -61,10 +66,11 @@ describe('GET /api/tickets', () => {
     expect(flags.filter((flag) => flag === 0)).toHaveLength(8);
   });
 
-  it('serves the remaining tickets on the next page', async () => {
-    const { body } = await listTickets('?page=2');
-    expect(body.tickets).toHaveLength(SEED_TICKETS.length - 20);
-    expect(body.pagination.page).toBe(2);
+  it('serves the remaining tickets on the last page', async () => {
+    const lastPage = Math.ceil(SEED_TICKETS.length / 20);
+    const { body } = await listTickets(`?page=${lastPage}`);
+    expect(body.tickets).toHaveLength(SEED_TICKETS.length - (lastPage - 1) * 20);
+    expect(body.pagination.page).toBe(lastPage);
   });
 
   it('returns an empty page beyond the last page', async () => {
@@ -162,7 +168,24 @@ describe('GET /api/tickets/summary', () => {
   it('returns counts across the whole queue', async () => {
     const { status, body } = await server.json<QueueSummary>('/api/tickets/summary');
     expect(status).toBe(200);
-    expect(body.counts).toEqual({ total: 40, overdue: 8, open: 25, inProgress: 7, resolved: 8 });
+    expect(body.counts).toEqual({
+      total: 43,
+      active: 35,
+      overdue: 8,
+      urgent: 8,
+      dueSoon: 3,
+      open: 27,
+      inProgress: 8,
+      resolved: 8,
+    });
+  });
+
+  it('counts due-soon tickets inside the 30 minute window, excluding overdue ones', async () => {
+    // At NOW + 20m the headset (due at +10m) is overdue; the conference room (+20m) is exactly due,
+    // the warehouse printer (+25m) is inside the window, and the ransomware ticket (+45m) now is too.
+    server.setNow(NOW + 20 * MINUTE);
+    const { body } = await server.json<QueueSummary>('/api/tickets/summary');
+    expect(body.counts).toMatchObject({ overdue: 9, dueSoon: 3 });
   });
 });
 
@@ -191,6 +214,17 @@ describe('POST /api/tickets', () => {
     expect(body.slaDeadline).toBe(new Date(NOW + 24 * HOUR).toISOString());
     expect(body.assignedAgentId).toBeNull();
     expect(body.description).toBe('Literally.');
+  });
+
+  it('accepts HIGH priority with its 8 hour SLA', async () => {
+    const { status, body } = await createTicket({ ...validTicket, priority: 'HIGH' });
+    expect(status).toBe(201);
+    expect(body).toMatchObject({
+      priority: 'HIGH',
+      slaDeadline: new Date(NOW + 8 * HOUR).toISOString(),
+      escalationCount: 0,
+      lastEscalatedAt: null,
+    });
   });
 
   it('trims text and rejects blank required fields', async () => {

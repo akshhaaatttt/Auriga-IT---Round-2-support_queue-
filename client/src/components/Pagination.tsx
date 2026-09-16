@@ -10,9 +10,6 @@ interface PaginationProps {
   onLimitChange: (limit: number) => void;
 }
 
-const BUTTON_CLASS =
-  'inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
-
 export function Pagination({ pagination, disabled, onPageChange, onLimitChange }: PaginationProps) {
   const { page, limit, total, totalPages } = pagination;
   const first = total === 0 ? 0 : (page - 1) * limit + 1;
@@ -22,23 +19,25 @@ export function Pagination({ pagination, disabled, onPageChange, onLimitChange }
   return (
     <nav
       aria-label="Queue pagination"
-      className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p className="text-sm text-slate-600" aria-live="polite">
-        Showing <span className="font-medium tabular-nums">{first}</span>–
-        <span className="font-medium tabular-nums">{last}</span> of{' '}
-        <span className="font-medium tabular-nums">{total}</span>
-      </p>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <label htmlFor="page-size">Per page</label>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-muted">
+        <p aria-live="polite">
+          <span className="font-mono font-medium text-ink tabular-nums">
+            {first}–{last}
+          </span>{' '}
+          of <span className="font-mono font-medium text-ink tabular-nums">{total}</span> tickets
+        </p>
+        <div className="flex items-center gap-2">
+          <label htmlFor="page-size" className="whitespace-nowrap">
+            Rows per page
+          </label>
           <select
             id="page-size"
             value={limit}
             disabled={disabled}
             onChange={(event) => onLimitChange(Number(event.target.value))}
-            className="rounded-md border border-slate-300 bg-white py-1 pl-2 pr-7 text-sm"
+            className="control h-8 w-20"
           >
             {PAGE_SIZE_OPTIONS.map((size) => (
               <option key={size} value={size}>
@@ -47,30 +46,31 @@ export function Pagination({ pagination, disabled, onPageChange, onLimitChange }
             ))}
           </select>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={disabled || page <= 1}
-            onClick={() => onPageChange(page - 1)}
-          >
-            <ChevronLeft aria-hidden className="size-4" />
-            Previous
-          </button>
-          <span className="px-1 text-sm text-slate-700 tabular-nums" aria-current="page">
-            Page {page} of {lastPage}
-          </span>
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={disabled || page >= lastPage}
-            onClick={() => onPageChange(page + 1)}
-          >
-            Next
-            <ChevronRight aria-hidden className="size-4" />
-          </button>
-        </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="btn btn-secondary h-8"
+          disabled={disabled || page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          <ChevronLeft aria-hidden className="size-4" />
+          Previous
+        </button>
+        <span className="min-w-24 px-1 text-center text-sm text-ink-muted" aria-current="page">
+          Page <span className="font-mono font-medium text-ink tabular-nums">{page}</span> of{' '}
+          <span className="font-mono tabular-nums">{lastPage}</span>
+        </span>
+        <button
+          type="button"
+          className="btn btn-secondary h-8"
+          disabled={disabled || page >= lastPage}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+          <ChevronRight aria-hidden className="size-4" />
+        </button>
       </div>
     </nav>
   );

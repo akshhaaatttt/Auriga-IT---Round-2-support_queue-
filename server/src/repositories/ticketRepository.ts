@@ -1,5 +1,6 @@
+import { DUE_SOON_WINDOW_MS } from '../config/constants.js';
 import type { DatabaseConnection } from '../db/database.js';
-import type { Priority, Ticket, TicketStatus } from '../models/ticket.js';
+import type { Priority, QueueTicket, Ticket, TicketStatus } from '../models/ticket.js';
 import { IS_OVERDUE_SQL, QUEUE_ORDER_BY_SQL } from './queueOrderSql.js';
 
 export const UNASSIGNED = 'unassigned';
@@ -18,10 +19,26 @@ export interface TicketWithAgent extends Ticket {
 
 export interface TicketCounts {
   total: number;
+  /** Unresolved tickets (open + in progress). */
+  active: number;
   overdue: number;
+  /** Unresolved URGENT tickets. */
+  urgent: number;
+  /** Unresolved tickets not yet overdue whose deadline is within DUE_SOON_WINDOW_MS. */
+  dueSoon: number;
   open: number;
   inProgress: number;
   resolved: number;
+}
+
+/** The fields the escalation service needs to decide on, and guard, a priority change. */
+export type EscalationCandidate = Pick<QueueTicket, 'id' | 'priority' | 'status' | 'slaDeadline'>;
+
+export interface PriorityEscalation {
+  id: string;
+  from: Priority;
+  to: Priority;
+  at: number;
 }
 
 export type TicketChanges = Partial<
@@ -40,6 +57,8 @@ interface TicketRow {
   created_at: number;
   updated_at: number;
   sla_deadline: number;
+  escalation_count: number;
+  last_escalated_at: number | null;
 }
 
 type SqlParams = Record<string, string | number | null>;
@@ -62,7 +81,7 @@ const COLUMN_BY_FIELD: Readonly<Record<keyof TicketChanges, string>> = {
 const SELECT_TICKET_SQL = `
   SELECT t.id, t.customer_name, t.title, t.description, t.priority, t.status,
          t.assigned_agent_id, a.name AS assigned_agent_name,
-         t.created_at, t.updated_at, t.sla_deadline
+         t.created_at, t.updated_at, t.sla_deadline, t.escalation_count, t.last_escalated_at
   FROM tickets t
   LEFT JOIN agents a ON a.id = t.assigned_agent_id
 `;
@@ -119,6 +138,8 @@ function toTicket(row: TicketRow): TicketWithAgent {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     slaDeadline: row.sla_deadline,
+    escalationCount: row.escalation_count,
+    lastEscalatedAt: row.last_escalated_at,
   };
 }
 
@@ -162,14 +183,18 @@ export class TicketRepository {
     const row = this.db
       .prepare<[SqlParams], TicketCounts>(
         `SELECT COUNT(*) AS total,
+                COALESCE(SUM(t.status <> 'RESOLVED'), 0) AS active,
                 COALESCE(SUM(${IS_OVERDUE_SQL}), 0) AS overdue,
+                COALESCE(SUM(t.status <> 'RESOLVED' AND t.priority = 'URGENT'), 0) AS urgent,
+                COALESCE(SUM(t.status <> 'RESOLVED' AND t.sla_deadline >= @now
+                             AND t.sla_deadline <= @now + @dueSoonWindow), 0) AS dueSoon,
                 COALESCE(SUM(t.status = 'OPEN'), 0) AS open,
                 COALESCE(SUM(t.status = 'IN_PROGRESS'), 0) AS inProgress,
                 COALESCE(SUM(t.status = 'RESOLVED'), 0) AS resolved
          FROM tickets t ${where.sql}`,
       )
-      .get(where.params);
-    return row ?? { total: 0, overdue: 0, open: 0, inProgress: 0, resolved: 0 };
+      .get({ ...where.params, dueSoonWindow: DUE_SOON_WINDOW_MS });
+    return row ?? { total: 0, active: 0, overdue: 0, urgent: 0, dueSoon: 0, open: 0, inProgress: 0, resolved: 0 };
   }
 
   findById(id: string): TicketWithAgent | null {
@@ -181,9 +206,11 @@ export class TicketRepository {
     this.db
       .prepare<[Ticket]>(
         `INSERT INTO tickets (id, customer_name, title, description, priority, status,
-                              assigned_agent_id, created_at, updated_at, sla_deadline)
+                              assigned_agent_id, created_at, updated_at, sla_deadline,
+                              escalation_count, last_escalated_at)
          VALUES (@id, @customerName, @title, @description, @priority, @status,
-                 @assignedAgentId, @createdAt, @updatedAt, @slaDeadline)`,
+                 @assignedAgentId, @createdAt, @updatedAt, @slaDeadline,
+                 @escalationCount, @lastEscalatedAt)`,
       )
       .run(ticket);
   }
@@ -205,6 +232,46 @@ export class TicketRepository {
       .prepare<[SqlParams]>(`UPDATE tickets SET ${assignments.join(', ')} WHERE id = @id`)
       .run(params);
     return result.changes > 0;
+  }
+
+  /**
+   * Unresolved, overdue tickets whose priority is not already `topPriority`. Filtering happens
+   * in SQL (served by the sla_deadline index), so only escalatable rows are loaded.
+   */
+  findEscalationCandidates(now: number, topPriority: Priority): EscalationCandidate[] {
+    return this.db
+      .prepare<[SqlParams], { id: string; priority: Priority; status: TicketStatus; sla_deadline: number }>(
+        `SELECT t.id, t.priority, t.status, t.sla_deadline
+         FROM tickets t
+         WHERE ${IS_OVERDUE_SQL} AND t.priority <> @topPriority
+         ORDER BY t.sla_deadline ASC, t.id ASC`,
+      )
+      .all({ now, topPriority })
+      .map((row) => ({ id: row.id, priority: row.priority, status: row.status, slaDeadline: row.sla_deadline }));
+  }
+
+  /**
+   * Compare-and-set priority change. It only applies if the ticket still has the priority the
+   * caller read (`from`) and is still unresolved and overdue at `at`, so a stale read can never
+   * move a ticket more than one level. Returns false when the guard did not match.
+   */
+  applyEscalation({ id, from, to, at }: PriorityEscalation): boolean {
+    const result = this.db
+      .prepare<[SqlParams]>(
+        `UPDATE tickets AS t
+         SET priority = @to,
+             updated_at = @now,
+             last_escalated_at = @now,
+             escalation_count = t.escalation_count + 1
+         WHERE t.id = @id AND t.priority = @from AND ${IS_OVERDUE_SQL}`,
+      )
+      .run({ id, from, to, now: at });
+    return result.changes > 0;
+  }
+
+  /** Runs `work` in a write transaction taken up-front, serialising it against other writers. */
+  runExclusive<T>(work: () => T): T {
+    return this.db.transaction(work).immediate();
   }
 
   delete(id: string): boolean {

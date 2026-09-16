@@ -21,7 +21,9 @@ const MARCUS = 'agent-marcus';
 
 /**
  * Relative creation times are chosen so the queue demonstrates every ordering rule.
- * SLA windows: URGENT 120 min, NORMAL and LOW 1440 min.
+ * SLA windows: URGENT 120 min, HIGH 480 min, NORMAL and LOW 1440 min.
+ * Note: once the server is running, the escalation scheduler raises overdue tickets one
+ * level per run, so the overdue section converges on URGENT within a few minutes.
  */
 export const SEED_TICKETS: readonly SeedTicket[] = [
   // Overdue: severely overdue NORMAL outranks slightly overdue URGENT.
@@ -41,6 +43,11 @@ export const SEED_TICKETS: readonly SeedTicket[] = [
   { title: 'Ransomware warning on reception PC', customerName: 'Umbrella Health', description: 'Pop-up demanding payment appeared. Machine has been unplugged from the network.', priority: 'URGENT', status: 'IN_PROGRESS', assignedAgentId: MARCUS, createdMinutesAgo: 75 },
   { title: 'Payroll export failing before cut-off', customerName: 'Initech', description: 'Payroll system throws a timeout on export. Payroll cut-off is 5pm today.', priority: 'URGENT', status: 'OPEN', assignedAgentId: PRIYA, createdMinutesAgo: 40 },
   { title: 'Website checkout returns error 502', customerName: 'Blue Bottle Retail', description: 'Online checkout fails intermittently; about one in three orders are lost.', priority: 'URGENT', status: 'OPEN', assignedAgentId: null, createdMinutesAgo: 8 },
+
+  // On time, HIGH: ordered by time remaining.
+  { title: 'Sales CRM login loop for the whole team', customerName: 'Initech', description: 'Sales reps are redirected back to the login page after signing in.', priority: 'HIGH', status: 'OPEN', assignedAgentId: PRIYA, createdMinutesAgo: 420 },
+  { title: 'Shared printer queue stuck in accounts', customerName: 'Northwind Traders', description: 'Forty jobs stuck; invoices due to be posted today.', priority: 'HIGH', status: 'IN_PROGRESS', assignedAgentId: MARCUS, createdMinutesAgo: 300 },
+  { title: 'Video conferencing kit failing in boardroom', customerName: 'Wayne Enterprises', description: 'Camera disconnects mid-call; investor meeting tomorrow morning.', priority: 'HIGH', status: 'OPEN', assignedAgentId: null, createdMinutesAgo: 60 },
 
   // On time, NORMAL: ordered by time remaining.
   { title: 'Conference room display will not mirror laptops', customerName: 'Stark Industries', description: 'Room "Jupiter" TV only shows "no signal" over HDMI and wireless.', priority: 'NORMAL', status: 'OPEN', assignedAgentId: MARCUS, createdMinutesAgo: 1420 },

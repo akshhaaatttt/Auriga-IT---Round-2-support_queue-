@@ -23,6 +23,8 @@ export function seedDatabase(db: DatabaseConnection, now: number = Date.now()): 
         createdAt,
         updatedAt: createdAt,
         slaDeadline: calculateSlaDeadline(createdAt, ticket.priority),
+        escalationCount: 0,
+        lastEscalatedAt: null,
       });
     });
   })();

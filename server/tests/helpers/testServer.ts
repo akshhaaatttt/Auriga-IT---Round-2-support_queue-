@@ -1,12 +1,17 @@
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createApp } from '../../src/app.js';
+import { createServices, type Services } from '../../src/container.js';
 import { IN_MEMORY_DATABASE, openDatabase, type DatabaseConnection } from '../../src/db/database.js';
 import { seedDatabase } from '../../src/db/seed.js';
 import { NOW } from './time.js';
 
+/** Swallows log output so test runs stay readable. */
+export const silentLogger = { info: () => undefined, error: () => undefined };
+
 export interface TestServer {
   db: DatabaseConnection;
+  services: Services;
   /** Moves the server's clock; tests control time explicitly. */
   setNow(now: number): void;
   request(path: string, init?: RequestInit): Promise<Response>;
@@ -18,7 +23,8 @@ export async function startTestServer(): Promise<TestServer> {
   let now = NOW;
   const db = openDatabase(IN_MEMORY_DATABASE);
   seedDatabase(db, NOW);
-  const app = createApp({ db, clock: () => now });
+  const services = createServices({ db, clock: () => now, logger: silentLogger });
+  const app = createApp({ services });
 
   const server = await new Promise<Server>((resolve) => {
     const listening = app.listen(0, () => resolve(listening));
@@ -34,6 +40,7 @@ export async function startTestServer(): Promise<TestServer> {
 
   return {
     db,
+    services,
     setNow: (value) => {
       now = value;
     },

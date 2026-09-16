@@ -13,6 +13,8 @@ export interface TicketDto {
   createdAt: string;
   updatedAt: string;
   slaDeadline: string;
+  escalationCount: number;
+  lastEscalatedAt: string | null;
   isOverdue: boolean;
 }
 

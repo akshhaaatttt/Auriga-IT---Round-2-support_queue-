@@ -11,7 +11,7 @@ import { HOUR, MINUTE, NOW } from './helpers/time.js';
  * The SQL ORDER BY is a second implementation of the canonical TypeScript comparator.
  * These tests pin the two together: any divergence fails here.
  */
-const PRIORITIES: readonly Priority[] = ['URGENT', 'NORMAL', 'LOW'];
+const PRIORITIES: readonly Priority[] = ['URGENT', 'HIGH', 'NORMAL', 'LOW'];
 const STATUSES: readonly TicketStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED'];
 const TICKET_COUNT = 1500;
 
@@ -34,6 +34,8 @@ function generateTickets(seed: number): Ticket[] {
       createdAt,
       updatedAt: createdAt,
       slaDeadline: calculateSlaDeadline(createdAt, priority) + legacyShift,
+      escalationCount: 0,
+      lastEscalatedAt: null,
     };
   });
 }

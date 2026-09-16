@@ -25,7 +25,7 @@ export function CreateTicketDialog({ open, agents, defaultAgentId, onClose, onCr
       open={open}
       onClose={onClose}
       title="New ticket"
-      description="The SLA deadline is set from the priority when the ticket is created."
+      description="The SLA deadline is fixed from the priority at the moment the ticket is created."
     >
       <TicketForm
         initialValues={initialValues}

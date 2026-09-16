@@ -8,6 +8,10 @@ describe('SLA policy', () => {
     expect(calculateSlaDeadline(NOW, 'URGENT')).toBe(NOW + 2 * HOUR);
   });
 
+  it('gives high tickets an 8 hour response window', () => {
+    expect(calculateSlaDeadline(NOW, 'HIGH')).toBe(NOW + 8 * HOUR);
+  });
+
   it('gives normal tickets a 24 hour response window', () => {
     expect(calculateSlaDeadline(NOW, 'NORMAL')).toBe(NOW + 24 * HOUR);
   });

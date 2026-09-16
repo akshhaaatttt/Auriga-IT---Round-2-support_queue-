@@ -1,52 +1,88 @@
-import { LifeBuoy, Plus } from 'lucide-react';
+import { ListOrdered, Loader2, Plus, RotateCw } from 'lucide-react';
 import type { Agent } from '../types/api';
+import { Avatar } from './Avatar';
 
 interface AppHeaderProps {
   agents: readonly Agent[];
   currentAgent: Agent | null;
   onAgentChange: (agentId: string) => void;
   onCreateTicket: () => void;
+  lastUpdated: string | null;
+  isRefreshing: boolean;
+  onRefresh: () => void;
 }
 
-export function AppHeader({ agents, currentAgent, onAgentChange, onCreateTicket }: AppHeaderProps) {
+export function AppHeader({
+  agents,
+  currentAgent,
+  onAgentChange,
+  onCreateTicket,
+  lastUpdated,
+  isRefreshing,
+  onRefresh,
+}: AppHeaderProps) {
   return (
-    <header className="bg-slate-900 text-white">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-2.5">
-          <LifeBuoy aria-hidden className="size-6 text-red-400" />
-          <div>
-            <h1 className="text-lg font-semibold leading-tight">Support Queue</h1>
-            <p className="text-xs text-slate-400">IT Helpdesk</p>
+    <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-14 max-w-[90rem] items-center gap-3 px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white">
+            <ListOrdered className="size-4.5" />
+          </span>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-[15px] font-semibold text-ink">Support Queue</p>
+            <p className="hidden truncate text-xs text-ink-subtle sm:block">IT Helpdesk operations</p>
           </div>
         </div>
 
-        <div className="ml-auto flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            <label htmlFor="current-agent" className="whitespace-nowrap">
-              Current agent
-            </label>
-            <select
-              id="current-agent"
-              value={currentAgent?.id ?? ''}
-              onChange={(event) => onAgentChange(event.target.value)}
-              disabled={agents.length === 0}
-              className="rounded-md border border-slate-600 bg-slate-800 py-1.5 pl-2 pr-8 text-sm text-white disabled:opacity-60"
-            >
-              {agents.length === 0 && <option value="">Loading agents…</option>}
-              {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </select>
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <div className="hidden items-center gap-2 text-xs text-ink-subtle md:flex" aria-live="off">
+            <span className="relative flex size-2" aria-hidden>
+              <span className="absolute inset-0 rounded-full bg-success/30" />
+              <span className="relative m-auto size-1.5 rounded-full bg-success" />
+            </span>
+            <span className="whitespace-nowrap">{lastUpdated ? `Live · updated ${lastUpdated}` : 'Connecting…'}</span>
           </div>
           <button
             type="button"
-            onClick={onCreateTicket}
-            className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            aria-label={isRefreshing ? 'Refreshing queue' : 'Refresh queue'}
+            title="Refresh queue"
+            className="btn btn-ghost btn-icon hidden sm:inline-flex"
           >
+            {isRefreshing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <RotateCw aria-hidden className="size-4" />}
+          </button>
+
+          <span aria-hidden className="hidden h-6 w-px bg-line sm:block" />
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="current-agent" className="sr-only sm:not-sr-only sm:text-xs sm:whitespace-nowrap sm:text-ink-subtle">
+              Signed in as
+            </label>
+            <div className="relative flex items-center">
+              <span className="pointer-events-none absolute left-2">
+                <Avatar name={currentAgent?.name ?? null} />
+              </span>
+              <select
+                id="current-agent"
+                value={currentAgent?.id ?? ''}
+                onChange={(event) => onAgentChange(event.target.value)}
+                disabled={agents.length === 0}
+                className="control w-36 pl-10 font-medium sm:w-44"
+              >
+                {agents.length === 0 && <option value="">Loading…</option>}
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button type="button" onClick={onCreateTicket} className="btn btn-primary" aria-label="New ticket">
             <Plus aria-hidden className="size-4" />
-            New ticket
+            <span className="hidden sm:inline">New ticket</span>
           </button>
         </div>
       </div>

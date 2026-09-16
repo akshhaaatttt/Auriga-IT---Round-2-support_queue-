@@ -25,3 +25,11 @@ and verification notes here during development.
 - Summary:
 - Changes made:
 - Verification:
+
+### Automated Priority Escalation — Twist
+- Date:
+- Tool:
+- Task:
+- Implementation summary:
+- Tests added:
+- Verification:
